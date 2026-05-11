@@ -62,6 +62,14 @@
     .section-toggle { font-size: 0.75rem; color: #444; transition: transform 0.2s; }
     .section-toggle.collapsed { transform: rotate(-90deg); }
 
+    .section-del {
+      font-size: 0.7rem; color: #2a2a2a; background: none; border: none;
+      cursor: pointer; padding: 2px 6px; border-radius: 4px;
+      transition: color 0.2s; flex-shrink: 0;
+    }
+    .section-header:hover .section-del { color: #555; }
+    .section-del:hover { color: #e05555 !important; }
+
     .tasks { display: flex; flex-direction: column; gap: 6px; }
     .tasks.hidden { display: none; }
 
@@ -254,11 +262,12 @@ function render() {
     const doneCnt = section.tasks.filter(t => t.done).length;
 
     sec.innerHTML = `
-      <div class="section-header" onclick="toggleSection(${si})">
-        <span class="section-icon">${section.icon}</span>
-        <span class="section-title">${escHtml(section.title)}</span>
-        <span class="section-count">${doneCnt}/${section.tasks.length}</span>
-        <span class="section-toggle ${section.open ? '' : 'collapsed'}">▼</span>
+      <div class="section-header">
+        <span class="section-icon" onclick="toggleSection(${si})">${section.icon}</span>
+        <span class="section-title" onclick="toggleSection(${si})">${escHtml(section.title)}</span>
+        <span class="section-count" onclick="toggleSection(${si})">${doneCnt}/${section.tasks.length}</span>
+        <span class="section-toggle ${section.open ? '' : 'collapsed'}" onclick="toggleSection(${si})">▼</span>
+        <button class="section-del" onclick="deleteSection(event,${si})">✕</button>
       </div>
       <div class="tasks ${section.open ? '' : 'hidden'}" id="tasks-${si}"></div>
       <div class="${section.open ? '' : 'hidden'}">
@@ -291,6 +300,7 @@ function render() {
 }
 
 window.toggleSection = (si) => { data[si].open = !data[si].open; scheduleSave(); render(); };
+window.deleteSection = (e, si) => { e.stopPropagation(); data.splice(si, 1); scheduleSave(); render(); };
 window.toggleTask = (si, ti) => { data[si].tasks[ti].done = !data[si].tasks[ti].done; scheduleSave(); render(); };
 window.deleteTask = (e, si, ti) => {
   e.stopPropagation();
