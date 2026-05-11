@@ -195,26 +195,7 @@ EMOJIS.forEach(e => {
   emojiRow.appendChild(btn);
 });
 
-const defaultData = [
-  { id: 's1', icon: '🎯', title: 'Главные цели', open: true, tasks: [
-    { id: 't1', text: 'Определить главную цель на год', done: false },
-    { id: 't2', text: 'Составить план на первый месяц', done: false },
-  ]},
-  { id: 's2', icon: '💼', title: 'Работа и карьера', open: true, tasks: [
-    { id: 't3', text: 'Обновить резюме', done: false },
-    { id: 't4', text: 'Пройти собеседования', done: false },
-  ]},
-  { id: 's3', icon: '📚', title: 'Учёба и навыки', open: true, tasks: [
-    { id: 't5', text: 'Выбрать курс или направление', done: false },
-  ]},
-  { id: 's4', icon: '🏠', title: 'Быт и жизнь', open: true, tasks: [
-    { id: 't6', text: 'Разобраться с документами', done: false },
-    { id: 't7', text: 'Обустроить своё пространство', done: false },
-  ]},
-  { id: 's5', icon: '❤️', title: 'Личное', open: true, tasks: [
-    { id: 't8', text: 'Встретиться с близкими', done: false },
-  ]},
-];
+const defaultData = [];
 
 function uid() { return Math.random().toString(36).slice(2); }
 
