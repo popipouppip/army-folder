@@ -261,11 +261,20 @@
       border-radius: 12px;
       padding: 16px;
       position: relative;
+      cursor: pointer;
       transition: border-color 0.2s;
     }
     .note-card:hover { border-color: #333; }
     .note-title { font-size: 0.95rem; font-weight: 600; color: #ddd; margin-bottom: 6px; }
-    .note-body { font-size: 0.9rem; color: #888; line-height: 1.55; white-space: pre-wrap; }
+    .note-body {
+      font-size: 0.9rem; color: #888; line-height: 1.55; white-space: pre-wrap;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .note-card.expanded .note-body { display: block; }
+    .note-expand {
+      font-size: 0.78rem; color: #444; margin-top: 8px;
+    }
+    .note-card.expanded .note-expand { color: #3a3a3a; }
     .note-date { font-size: 0.75rem; color: #3a3a3a; margin-top: 10px; }
     .note-del {
       position: absolute; top: 12px; right: 12px;
@@ -558,9 +567,14 @@ function renderNotes() {
     card.innerHTML = `
       ${note.title ? `<div class="note-title">${escHtml(note.title)}</div>` : ''}
       <div class="note-body">${escHtml(note.body)}</div>
+      <div class="note-expand">Читать далее ▾</div>
       <div class="note-date">${dateStr}</div>
-      <button class="note-del" onclick="deleteNote(${i})">✕</button>
+      <button class="note-del" onclick="event.stopPropagation();deleteNote(${i})">✕</button>
     `;
+    card.addEventListener('click', () => {
+      const expanded = card.classList.toggle('expanded');
+      card.querySelector('.note-expand').textContent = expanded ? 'Свернуть ▴' : 'Читать далее ▾';
+    });
     list.appendChild(card);
   });
 }
