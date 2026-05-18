@@ -225,6 +225,55 @@
     .link-del:hover { color: #e05555 !important; }
 
     .empty-hint { text-align: center; color: #333; font-size: 0.9rem; padding: 40px 0; }
+
+    /* Notes page */
+    .note-add-form {
+      background: #141414;
+      border: 1px solid #1f1f1f;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .note-add-form input, .note-add-form textarea {
+      background: #111; border: 1px solid #222; border-radius: 8px;
+      padding: 10px 14px; color: #ccc; font-size: 0.9rem; outline: none;
+      transition: border-color 0.2s; font-family: inherit;
+    }
+    .note-add-form input::placeholder, .note-add-form textarea::placeholder { color: #333; }
+    .note-add-form input:focus, .note-add-form textarea:focus { border-color: #3a3a3a; }
+    .note-add-form textarea { resize: vertical; min-height: 90px; }
+    .note-add-btn {
+      align-self: flex-end;
+      background: #1a1a2e; border: 1px solid #2a2a4a; color: #4f8ef7;
+      border-radius: 8px; padding: 9px 20px; font-size: 0.9rem;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .note-add-btn:hover { background: #22224a; }
+
+    .notes-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .note-card {
+      background: #141414;
+      border: 1px solid #1f1f1f;
+      border-radius: 12px;
+      padding: 16px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+    .note-card:hover { border-color: #333; }
+    .note-title { font-size: 0.95rem; font-weight: 600; color: #ddd; margin-bottom: 6px; }
+    .note-body { font-size: 0.9rem; color: #888; line-height: 1.55; white-space: pre-wrap; }
+    .note-date { font-size: 0.75rem; color: #3a3a3a; margin-top: 10px; }
+    .note-del {
+      position: absolute; top: 12px; right: 12px;
+      font-size: 0.7rem; color: #2a2a2a; background: none; border: none;
+      cursor: pointer; padding: 4px 6px; border-radius: 4px; transition: color 0.2s;
+    }
+    .note-card:hover .note-del { color: #555; }
+    .note-del:hover { color: #e05555 !important; }
   </style>
 </head>
 <body>
@@ -238,6 +287,7 @@
 <div class="nav">
   <button class="nav-btn active" onclick="showPage('tasks')">📋 Задачи</button>
   <button class="nav-btn" onclick="showPage('links')">🔗 Ссылки</button>
+  <button class="nav-btn" onclick="showPage('notes')">📝 Заметки</button>
 </div>
 
 <!-- Задачи -->
@@ -271,6 +321,18 @@
   </div>
 </div>
 
+<!-- Заметки -->
+<div class="page" id="page-notes">
+  <div class="container">
+    <div class="note-add-form">
+      <input id="noteTitle" placeholder="Заголовок (необязательно)" />
+      <textarea id="noteBody" placeholder="Текст заметки..."></textarea>
+      <button class="note-add-btn" onclick="addNote()">Добавить</button>
+    </div>
+    <div class="notes-list" id="notesList"></div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc }
@@ -287,12 +349,14 @@ const db = getFirestore(initializeApp({
 
 const TASKS_REF = doc(db, 'army-folder', 'main');
 const LINKS_REF = doc(db, 'army-folder', 'links');
+const NOTES_REF = doc(db, 'army-folder', 'notes');
 
 const EMOJIS = ['🎯','💪','📚','🎓','💼','🏠','❤️','✈️','🏋️','🎮','🎵','💰','🛠️','🌱','🤝','🚗','📱','🧠','🎨','📝'];
 let selectedEmoji = '📌';
 let saveTimer = null;
 let data = [];
 let links = [];
+let notes = [];
 
 // Emoji picker
 const emojiRow = document.getElementById('emojiRow');
@@ -331,14 +395,17 @@ function scheduleSave(ref, payload) {
 
 async function init() {
   try {
-    const [snapT, snapL] = await Promise.all([getDoc(TASKS_REF), getDoc(LINKS_REF)]);
+    const [snapT, snapL, snapN] = await Promise.all([getDoc(TASKS_REF), getDoc(LINKS_REF), getDoc(NOTES_REF)]);
     data = snapT.exists() ? snapT.data().data : [];
     links = snapL.exists() ? snapL.data().links : [];
+    notes = snapN.exists() ? snapN.data().notes : [];
     if (!snapT.exists()) await setDoc(TASKS_REF, { data });
     if (!snapL.exists()) await setDoc(LINKS_REF, { links });
-  } catch(e) { data = []; links = []; }
+    if (!snapN.exists()) await setDoc(NOTES_REF, { notes });
+  } catch(e) { data = []; links = []; notes = []; }
   renderTasks();
   renderLinks();
+  renderNotes();
 }
 
 // ── Nav ──
@@ -473,6 +540,44 @@ window.addLink = () => {
 window.deleteLink = (i) => {
   links.splice(i, 1);
   scheduleSave(LINKS_REF, { links }); renderLinks();
+};
+
+// ── Notes ──
+function renderNotes() {
+  const list = document.getElementById('notesList');
+  list.innerHTML = '';
+  if (!notes.length) {
+    list.innerHTML = '<div class="empty-hint">Пока нет ни одной заметки</div>';
+    return;
+  }
+  notes.forEach((note, i) => {
+    const card = document.createElement('div');
+    card.className = 'note-card';
+    const d = new Date(note.ts);
+    const dateStr = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+    card.innerHTML = `
+      ${note.title ? `<div class="note-title">${escHtml(note.title)}</div>` : ''}
+      <div class="note-body">${escHtml(note.body)}</div>
+      <div class="note-date">${dateStr}</div>
+      <button class="note-del" onclick="deleteNote(${i})">✕</button>
+    `;
+    list.appendChild(card);
+  });
+}
+
+window.addNote = () => {
+  const title = document.getElementById('noteTitle').value.trim();
+  const body = document.getElementById('noteBody').value.trim();
+  if (!body) return;
+  notes.unshift({ id: uid(), title, body, ts: Date.now() });
+  document.getElementById('noteTitle').value = '';
+  document.getElementById('noteBody').value = '';
+  scheduleSave(NOTES_REF, { notes }); renderNotes();
+};
+
+window.deleteNote = (i) => {
+  notes.splice(i, 1);
+  scheduleSave(NOTES_REF, { notes }); renderNotes();
 };
 
 // Enter в полях ссылок
