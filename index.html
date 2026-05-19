@@ -8,12 +8,22 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: #0d0d0d;
+      background: #0d0d0d url('bg.jpg') center center / cover fixed;
       color: #e8e8e8;
       font-family: 'Segoe UI', system-ui, sans-serif;
       min-height: 100vh;
       padding: 40px 20px 80px;
     }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 0;
+    }
+
+    header, .nav, .page, .progress-bar-wrap, .progress-label { position: relative; z-index: 1; }
 
     header { text-align: center; margin-bottom: 32px; }
     header h1 { font-size: 2.4rem; font-weight: 700; color: #fff; }
