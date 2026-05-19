@@ -293,13 +293,35 @@
     }
     .note-card:hover .note-del { color: #555; }
     .note-del:hover { color: #e05555 !important; }
+
+    .note-file-input { display: none; }
+    .note-file-label {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #111; border: 1px dashed #333; border-radius: 8px;
+      padding: 8px 14px; color: #555; font-size: 0.85rem; cursor: pointer;
+      transition: border-color 0.2s, color 0.2s; align-self: flex-start;
+    }
+    .note-file-label:hover { border-color: #555; color: #888; }
+    .note-files-selected { font-size: 0.8rem; color: #555; min-height: 18px; }
+
+    .note-attachments { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .note-attach {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #1a1a1a; border: 1px solid #222; border-radius: 6px;
+      padding: 4px 10px; text-decoration: none; color: #777;
+      font-size: 0.8rem; transition: border-color 0.2s, color 0.2s; max-width: 100%;
+    }
+    .note-attach:hover { border-color: #444; color: #ccc; }
+    .note-attach span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+    .note-attach-img { max-width: 100%; border-radius: 8px; margin-top: 10px; cursor: pointer; }
+
+    .note-uploading { font-size: 0.82rem; color: #a259f7; margin-top: 4px; }
   </style>
 </head>
 <body>
 
 <header>
   <h1>📁 Папка после армии</h1>
-  <p>Всё, что ждёт тебя на гражданке</p>
   <div id="syncStatus"></div>
 </header>
 
@@ -346,6 +368,10 @@
     <div class="note-add-form">
       <input id="noteTitle" placeholder="Заголовок (необязательно)" />
       <textarea id="noteBody" placeholder="Текст заметки..."></textarea>
+      <label class="note-file-label" for="noteFiles">📎 Прикрепить файлы</label>
+      <input type="file" id="noteFiles" class="note-file-input" multiple />
+      <div class="note-files-selected" id="noteFilesSelected"></div>
+      <div class="note-uploading" id="noteUploading" style="display:none">Загружаю файлы...</div>
       <button class="note-add-btn" onclick="addNote()">Добавить</button>
     </div>
     <div class="notes-list" id="notesList"></div>
@@ -356,15 +382,19 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 
-const db = getFirestore(initializeApp({
+const app = initializeApp({
   apiKey: "AIzaSyDCMjN0EnRKT6uvMyHuDLs2WVZfahGJ11E",
   authDomain: "trandspot-a85df.firebaseapp.com",
   projectId: "trandspot-a85df",
   storageBucket: "trandspot-a85df.firebasestorage.app",
   messagingSenderId: "824848162009",
   appId: "1:824848162009:web:482603373f3c84520bf2c8"
-}));
+});
+const db = getFirestore(app);
+const storage = getStorage(app);
 
 const TASKS_REF = doc(db, 'army-folder', 'main');
 const LINKS_REF = doc(db, 'army-folder', 'links');
@@ -376,6 +406,18 @@ let saveTimer = null;
 let data = [];
 let links = [];
 let notes = [];
+
+// File input label
+document.getElementById('noteFiles').addEventListener('change', function() {
+  const names = Array.from(this.files).map(f => f.name).join(', ');
+  document.getElementById('noteFilesSelected').textContent = names || '';
+});
+
+async function uploadFile(file) {
+  const r = sRef(storage, `notes/${uid()}_${file.name}`);
+  await uploadBytes(r, file);
+  return { name: file.name, url: await getDownloadURL(r), type: file.type };
+}
 
 // Emoji picker
 const emojiRow = document.getElementById('emojiRow');
@@ -574,10 +616,18 @@ function renderNotes() {
     card.className = 'note-card';
     const d = new Date(note.ts);
     const dateStr = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+    const attachHtml = (note.files || []).map(f => {
+      if (f.type.startsWith('image/')) {
+        return `<a href="${f.url}" target="_blank"><img class="note-attach-img" src="${f.url}" /></a>`;
+      }
+      const icon = f.type === 'application/pdf' ? '📄' : f.type.startsWith('video/') ? '🎬' : f.type.startsWith('audio/') ? '🎵' : '📎';
+      return `<a class="note-attach" href="${f.url}" target="_blank" rel="noopener">${icon} <span>${escHtml(f.name)}</span></a>`;
+    }).join('');
     card.innerHTML = `
       ${note.title ? `<div class="note-title">${escHtml(note.title)}</div>` : ''}
       <div class="note-body">${escHtml(note.body)}</div>
-      <div class="note-expand">Читать далее ▾</div>
+      ${note.body ? '<div class="note-expand">Читать далее ▾</div>' : ''}
+      ${attachHtml ? `<div class="note-attachments">${attachHtml}</div>` : ''}
       <div class="note-date">${dateStr}</div>
       <button class="note-del" onclick="event.stopPropagation();deleteNote(${i})">✕</button>
     `;
@@ -589,13 +639,28 @@ function renderNotes() {
   });
 }
 
-window.addNote = () => {
+window.addNote = async () => {
   const title = document.getElementById('noteTitle').value.trim();
   const body = document.getElementById('noteBody').value.trim();
-  if (!body) return;
-  notes.unshift({ id: uid(), title, body, ts: Date.now() });
+  const filesInput = document.getElementById('noteFiles');
+  if (!body && !filesInput.files.length) return;
+  const uploader = document.getElementById('noteUploading');
+  const btn = document.querySelector('.note-add-btn');
+  btn.disabled = true;
+  const files = [];
+  if (filesInput.files.length) {
+    uploader.style.display = 'block';
+    for (const f of filesInput.files) {
+      try { files.push(await uploadFile(f)); } catch(e) {}
+    }
+    uploader.style.display = 'none';
+  }
+  notes.unshift({ id: uid(), title, body, files, ts: Date.now() });
   document.getElementById('noteTitle').value = '';
   document.getElementById('noteBody').value = '';
+  filesInput.value = '';
+  document.getElementById('noteFilesSelected').textContent = '';
+  btn.disabled = false;
   scheduleSave(NOTES_REF, { notes }); renderNotes();
 };
 
